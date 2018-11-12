@@ -163,6 +163,7 @@ def create_lr_scheduler(**kwargs):
           if list then the first scheduler should be a warmup scheduler.
     """
     sched_type = kwargs.get('lr_scheduler_type')
+    print('LOOKY HERE', sched_type) 
     if sched_type is None:
         return None
     sched_type = listify(sched_type)

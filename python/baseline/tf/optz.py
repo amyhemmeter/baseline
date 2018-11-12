@@ -1,5 +1,5 @@
 import tensorflow as tf
-from baseline.train import register_lr_scheduler, create_lr_scheduler, WarmupLearningRateScheduler
+from baseline.train import register_lr_scheduler, create_lr_scheduler
 import math
 
 
@@ -13,10 +13,11 @@ class ConstantSchedulerTensorFlow(object):
 
 
 @register_lr_scheduler('warmup_linear')
-class WarmupLinearSchedulerTensorFlow(WarmupLearningRateScheduler):
+class WarmupLinearSchedulerTensorFlow(object):
 
-    def __init__(self, **kwargs):
-        super(WarmupLinearSchedulerTensorFlow, self).__init__(**kwargs)
+    def __init__(self, warmup_steps=16000, **kwargs):
+        super(WarmupLinearSchedulerTensorFlow, self).__init__()
+        self.warmup_steps = warmup_steps
 
     def __call__(self, lr, global_step):
         return tf.minimum(1.0, tf.cast(global_step / self.warmup_steps, dtype=tf.float32)) * lr
@@ -93,26 +94,6 @@ class ExponentialDecaySchedulerTensorFlow(object):
         return tf.train.exponential_decay(lr, global_step, self.decay_steps, self.decay_rate, staircase=self.staircase)
 
 
-@register_lr_scheduler('composite')
-class CompositeLRSchedulerTensorFlow(object):
-    def __init__(self, warm=None, rest=None, **kwargs):
-        self.warm = warm
-        self.rest = rest
-
-    def __call__(self, lr, global_step):
-        warm_tensor = self.warm(lr, global_step)
-        def call_warm(): return warm_tensor
-
-        rest_step = tf.subtract(global_step, tf.constant(self.warm.warmup_steps))
-        rest_tensor = self.rest(lr, rest_step)
-        def call_rest(): return rest_tensor
-
-        return tf.cond(
-            global_step < self.warm.warmup_steps,
-            call_warm, call_rest
-        )
-
-
 class AdamWOptimizer(tf.train.Optimizer):
     """A basic Adam optimizer that includes "correct" L2 weight decay.
 
@@ -135,14 +116,6 @@ class AdamWOptimizer(tf.train.Optimizer):
         self.beta_1 = beta_1
         self.beta_2 = beta_2
         self.epsilon = epsilon
-
-    def _get_variable_name(self, param_name):
-        import re
-        """Get the variable name from the tensor name."""
-        m = re.match("^(.*):\\d+$", param_name)
-        if m is not None:
-            param_name = m.group(1)
-        return param_name
 
     def apply_gradients(self, grads_and_vars, global_step=None, name=None):
         assignments = []
@@ -186,38 +159,37 @@ class AdamWOptimizer(tf.train.Optimizer):
 
 def optimizer(loss_fn, **kwargs):
 
-    #global_step = tf.Variable(0, trainable=False)
-    global_step = tf.train.get_or_create_global_step()
+    global_step = tf.Variable(0, trainable=False)
     clip = kwargs.get('clip', None)
+    mom = float(kwargs.get('mom', 0.9))
     optim = kwargs.get('optim', 'sgd')
     eta = kwargs.get('lr', kwargs.get('eta', 0.01))
     lr_scheduler = create_lr_scheduler(**kwargs)
     decay_fn = None
     colocate_gradients_with_ops = bool(kwargs.get('colocate_gradients_with_ops', False))
-    sgd_mom = float(kwargs.get('mom', 0.9))
+
     if optim == 'adadelta':
-        #print('adadelta', eta)
+        print('adadelta', eta)
         optz = lambda lr: tf.train.AdadeltaOptimizer(lr, 0.95, 1e-6)
     elif optim == 'adam':
-        #print('adam', eta)
-        optz = lambda lr: tf.train.AdamOptimizer(lr, kwargs.get('beta1', 0.9), kwargs.get('beta2', 0.999), kwargs.get('epsilon', 1e-8))
+        print('adam', eta)
+        optz = lambda lr: tf.train.AdamOptimizer(lr)
     elif optim == 'adamw':
         wd = float(kwargs.get('weight_decay', 0))
-        optz = lambda lr: AdamWOptimizer(lr, wd, kwargs.get('beta1', 0.9), kwargs.get('beta2', 0.999), kwargs.get('epsilon', 1e-8))
+        optz = lambda lr: AdamWOptimizer(lr, weight_decay=wd)
     elif optim == 'rmsprop':
-        #print('rmsprop', eta)
-        optz = lambda lr: tf.train.RMSPropOptimizer(lr, momentum=float(kwargs.get('mom', 0.0)))
-    elif sgd_mom > 0:
-        #print('sgd-mom', eta, sgd_mom)
-        optz = lambda lr: tf.train.MomentumOptimizer(lr, sgd_mom)
+        print('rmsprop', eta)
+        optz = lambda lr: tf.train.RMSPropOptimizer(lr, momentum=mom)
+    elif mom > 0:
+        print('sgd-mom', eta, mom)
+        optz = lambda lr: tf.train.MomentumOptimizer(lr, mom)
     else:
-        #print('sgd')
+        print('sgd')
         optz = lambda lr: tf.train.GradientDescentOptimizer(lr)
 
-    #print('clip', clip)
-    #print('decay', decay_fn)
+    print('clip', clip)
+    print('decay', decay_fn)
     return global_step, tf.contrib.layers.optimize_loss(loss_fn, global_step, eta, optz,
                                                         colocate_gradients_with_ops=colocate_gradients_with_ops,
-                                                        clip_gradients=clip, learning_rate_decay_fn=lr_scheduler,
-                                                        increment_global_step=True)
+                                                        clip_gradients=clip, learning_rate_decay_fn=lr_scheduler)
 
