@@ -111,7 +111,7 @@ class CompositeLRSchedulerTensorFlow(object):
             global_step < self.warm.warmup_steps,
             call_warm, call_rest
         )
-    
+
 
 class AdamWOptimizer(tf.train.Optimizer):
     """A basic Adam optimizer that includes "correct" L2 weight decay.
@@ -220,3 +220,4 @@ def optimizer(loss_fn, **kwargs):
                                                         colocate_gradients_with_ops=colocate_gradients_with_ops,
                                                         clip_gradients=clip, learning_rate_decay_fn=lr_scheduler,
                                                         increment_global_step=True)
+
