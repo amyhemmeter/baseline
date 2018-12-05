@@ -51,10 +51,8 @@ class ClassifierModelBase(ClassifierModel):
     #    return self.impl.fit(batch_time, batch_size=batchsz)
 
     def predict(self, batch_time):
-
         batchsz = batch_time.shape[0]
         probs = self.impl.predict(batch_time, batchsz)
-
         results = []
         for b in range(batchsz):
             outcomes = [(self.labels[id_i], prob_i) for id_i, prob_i in enumerate(probs[b])]
