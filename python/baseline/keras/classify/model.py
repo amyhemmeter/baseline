@@ -50,7 +50,7 @@ class ClassifierModelBase(ClassifierModel):
     #    batchsz = batch_time.shape[0]
     #    return self.impl.fit(batch_time, batch_size=batchsz)
 
-   def predict(self, batch_dict):
+    def predict(self, batch_dict):
         example_dict = self.make_input(batch_dict)
         probs = self.impl.predict_on_batch(example_dict)
         results = []
