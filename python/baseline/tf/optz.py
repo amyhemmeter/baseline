@@ -112,8 +112,8 @@ class CompositeLRSchedulerTensorFlow(object):
             call_warm, call_rest
         )
     
-    
-    class AdamWOptimizer(tf.train.Optimizer):
+
+class AdamWOptimizer(tf.train.Optimizer):
     """A basic Adam optimizer that includes "correct" L2 weight decay.
 
     Modified from: https://github.com/google-research/bert/blob/master/optimization.py
@@ -143,7 +143,7 @@ class CompositeLRSchedulerTensorFlow(object):
         if m is not None:
             param_name = m.group(1)
         return param_name
-    
+
     def apply_gradients(self, grads_and_vars, global_step=None, name=None):
         assignments = []
         for (grad, param) in grads_and_vars:
